@@ -43,6 +43,7 @@ Edit `config.yaml` to customize:
 
 - Limited handwriting recognition
 - Optimized for Vietnamese language only
+- Depend on teseract trained data
 - Complex table structures may require verification
 
 ## License
