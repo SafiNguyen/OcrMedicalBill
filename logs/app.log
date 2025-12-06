@@ -1,2 +1,11 @@
 2025-12-06 22:24:16,118 - OCRApp - INFO - App started
 2025-12-06 22:24:16,238 - OCREngine - INFO - Tesseract path: C:\Program Files\Tesseract-OCR\tesseract.exe
+2025-12-06 22:25:46,268 - OCRApp - INFO - App started
+2025-12-06 22:25:46,392 - OCREngine - INFO - Tesseract path: e:\prj\OcrMedicalBill\tesseract/tesseract.exe
+2025-12-06 22:26:21,069 - KeywordExtractor - INFO - KeyBERT loaded
+2025-12-06 22:26:40,620 - ImagePreprocessor - INFO - Processing image: C:/Users/winte/Downloads/3 (2) (1).jpg
+2025-12-06 22:26:41,067 - ImagePreprocessor - INFO - Image preprocessing completed
+2025-12-06 22:26:42,653 - OCREngine - INFO - OCR completed. Extracted 482 characters
+2025-12-06 22:26:57,673 - ImagePreprocessor - INFO - Processing image: C:/Users/winte/Downloads/đơn thuốc in điện tử.jpg
+2025-12-06 22:26:57,843 - ImagePreprocessor - INFO - Image preprocessing completed
+2025-12-06 22:26:58,522 - OCREngine - INFO - OCR completed. Extracted 728 characters
