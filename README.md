@@ -39,12 +39,6 @@ Edit `config.yaml` to customize:
 - Keyword classification rules
 - Model settings
 
-## Performance
-
-- Processing time: 5-10 seconds per document
-- Optimized for printed text
-- Best results with clear, well-lit images
-
 ## Limitations
 
 - Limited handwriting recognition
