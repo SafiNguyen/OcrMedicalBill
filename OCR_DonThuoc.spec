@@ -2,13 +2,10 @@
 
 
 a = Analysis(
-    ['Core.py'],
+    ['core.py'],
     pathex=[],
     binaries=[],
-   datas=[
-    ('tesseract', 'tesseract'),
-    ]
-
+    datas=[('tesseract', 'tesseract')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

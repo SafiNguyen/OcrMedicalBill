@@ -1,0 +1,42 @@
+app:
+  name: "OCR + KE - Đơn Thuốc Việt Nam"
+  version: "1.0.0"
+  window_size: "1200x750"
+
+tesseract:
+  path: "tesseract/tesseract.exe"
+  lang: "vie"
+  config: "--oem 1 --psm 6"
+
+models:
+  keybert: "paraphrase-multilingual-MiniLM-L12-v2"
+  cache_dir: "models/"
+
+ocr:
+  max_image_dimension: 1600
+  denoise_strength: 10
+  adaptive_threshold_block: 31
+  adaptive_threshold_c: 9
+
+keywords:
+  info:
+    - "họ tên"
+    - "họ và tên"
+    - "bệnh nhân"
+    - "tên bn"
+    - "tuổi"
+    - "địa chỉ"
+    - "bác sĩ"
+    - "chẩn đoán"
+    - "ngày khám"
+  
+  blacklist:
+    - "stt"
+    - "tên thuốc"
+    - "hàm lượng"
+    - "đơn thuốc"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/app.log"
