@@ -9,19 +9,6 @@ class KeywordExtractor:
     def __init__(self):
         self.config = Config()
         self.logger = Logger.get_logger('KeywordExtractor')
-        self.kw_model = None
-        self._load_keybert()
-    
-    def _load_keybert(self):
-        """Load KeyBERT model"""
-        try:
-            from keybert import KeyBERT
-            model_name = self.config.get('models.keybert')
-            self.kw_model = KeyBERT(model=model_name)
-            self.logger.info("KeyBERT loaded")
-        except Exception as e:
-            self.logger.warning(f"KeyBERT not loaded: {e}")
-            self.kw_model = None
     
     def extract(self, text, callback=None):
         """Phân tích và phân loại văn bản"""
@@ -29,9 +16,16 @@ class KeywordExtractor:
             if callback:
                 callback("⏳ Analyzing text...")
             
-            keybert_words = self._get_keybert_keywords(text)
             lines = self._parse_lines(text)
-            patient_info, medications = self._classify_lines(lines, keybert_words)
+            self.logger.debug(f"Parsed {len(lines)} lines from OCR text")
+            
+            patient_info, medications = self._classify_lines(lines)
+            
+            self.logger.info(f"Extracted {len(patient_info)} info lines, {len(medications)} medications")
+            
+            # If still empty, log the actual text for debugging
+            if not patient_info and not medications:
+                self.logger.warning(f"No results extracted. Text preview: {text[:200]}")
             
             return {'info': patient_info, 'meds': medications}
             
@@ -39,44 +33,113 @@ class KeywordExtractor:
             self.logger.error(f"Extraction error: {e}")
             raise
     
-    def _get_keybert_keywords(self, text):
-        if self.kw_model is None:
-            return []
-        try:
-            kws = self.kw_model.extract_keywords(text, keyphrase_ngram_range=(1,2), top_n=40)
-            return [k[0].lower() for k in kws if isinstance(k, (list, tuple)) and k]
-        except:
-            return []
-    
     def _parse_lines(self, text):
+        """Smart line parsing that handles both structured and unstructured OCR text"""
         lines = []
-        for ln in text.splitlines():
+        
+        # First try: split by actual line breaks
+        potential_lines = text.splitlines()
+        
+        # If very few lines (< 3), the text is likely one huge block - split it
+        if len(potential_lines) < 3:
+            # Split on sentence-like boundaries: period + space + capital letter, or common keywords
+            segments = re.split(r'(?:\.(?=\s+[A-ZÀÁẢÃẠĂẰẲẴẶÂẦẨẪẬÉÈẺẼẸÊỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỒỔỖỘƠỜỞỠỢÚÙỦŨỤƯỪỬỮỰÝỲỶỸỴĐ])|(?=(?:PROPANOLOL|AUGMENTIN|PARACETAMOL|IBUPROFEN|SỐ|ĐƠN THUỐC)))', text, maxsplit=50)
+            potential_lines = [s.strip() for s in segments if s.strip()]
+        
+        for ln in potential_lines:
+            # Clean up whitespace
             s = re.sub(r'\s+', ' ', ln.strip())
-            if len(s) >= 2:
+            
+            # Keep lines that have actual Vietnamese text (not just symbols)
+            if len(s) >= 3 and re.search(r'[a-záàảãạăằẳẵặâầẩẫậéèẻẽẹêềểễệíìỉĩịóòỏõọôồổỗộơờởỡợúùủũụưừửữựýỳỷỹỵđA-ZÀÁẢÃẠĂẰẲẴẶÂẦẨẪẬÉÈẺẼẸÊỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỒỔỖỘƠỜỞỠỢÚÙỦŨỤƯỪỬỮỰÝỲỶỸỴĐ]', s):
                 lines.append(s)
+        
+        self.logger.debug(f"Total lines parsed: {len(lines)}")
+        if len(lines) < 1:
+            self.logger.warning(f"Very few lines parsed. Raw text: {text[:100]}")
+        
         return lines
     
-    def _classify_lines(self, lines, keybert_words):
-        info_keywords = self.config.get('keywords.info', [])
-        blacklist = self.config.get('keywords.blacklist', [])
+    def _classify_lines(self, lines):
+        info_keywords = self.config.get('keywords.info', []) or []
         
         patient_info = []
         medications = []
         
-        med_pattern = re.compile(r"\d+\s*(mg|ml|g|viên|tab)", re.I)
-        dosage_pattern = re.compile(r"\b(uống|sáng|chiều|tối)\b", re.I)
+        # Build pattern for info keywords with fuzzy matching
+        info_pattern_parts = []
+        for kw in info_keywords:
+            # Make each keyword match even with OCR errors
+            info_pattern_parts.append(re.escape(kw.lower()))
+        
+        if info_pattern_parts:
+            info_pattern = re.compile('|'.join(info_pattern_parts), re.I)
+        else:
+            info_pattern = None
+        
+        # Medication patterns
+        med_pattern = re.compile(r"\d+\s*(mg|ml|g|viên|tab|mcg|%)", re.I)
+        dosage_pattern = re.compile(r"\b(uống|sáng|chiều|tối|buổi|lần|ngày|tuần|gói|lần|x)\b", re.I)
+        unit_pattern = re.compile(r"\b(mg|ml|g|viên|tab|mcg|%|gói)\b", re.I)
+        
+        # Common drug names - explicitly list them (including misspelled versions from OCR)
+        drug_names = r"\b(PROPANOLOL|AUGMENTIN|AUNGMENTIN|PARACETAMOL|IBUPROFEN|AMOXICILLIN|CEPHALEXIN|CEFIXIME|OMEPRAZOLE|RANITIDINE|SALBUTAMOL|LORATADINE|CETIRIZINE|VITAMIN|ASPIRIN|METFORMIN|LISINOPRIL|AMLODIPINE|LACTASE|SODIUM|CALCIUM|ZINC|IRON|ERYTHROMYCIN|DOXYCYCLINE|FLUOROQUINOLONE)\b"
+        drug_pattern = re.compile(drug_names, re.I)
+        
+        # Exclude patterns - these are definitely NOT medications
+        exclude_pattern = re.compile(r"(phòng khám|bệnh viện|bs\.|dr\.|thi|trang|địa|bệnh viện|số điện|quận|thành phố|tỉnh|www|@|\.com|\.vn|^[a-z0-9]{1,2}$)", re.I)
+        
+        # Clean function
+        def clean_for_match(text):
+            return re.sub(r'[^a-záàảãạăằẳẵặâầẩẫậéèẻẽẹêềểễệíìỉĩịóòỏõọôồổỗộơờởỡợúùủũụưừửữựýỳỷỹỵđ0-9\s]', '', text.lower())
         
         for ln in lines:
-            lnl = ln.lower()
-            
-            if any(bad in lnl for bad in blacklist):
+            if not ln or len(ln) < 2:
                 continue
             
-            if any(k in lnl for k in info_keywords):
+            lnl = ln.lower()
+            lnl_clean = clean_for_match(lnl)
+            
+            # Skip lines with exclude patterns (but keep if they have drug names)
+            if exclude_pattern.search(ln) and not drug_pattern.search(ln):
+                continue
+            
+            # PRIORITY 1: If it contains drug name, it's medication
+            if drug_pattern.search(ln):
+                medications.append(ln)
+                continue
+            
+            # PRIORITY 2: Check if it contains patient info keyword
+            if info_pattern and info_pattern.search(lnl_clean):
                 patient_info.append(ln)
                 continue
             
-            if dosage_pattern.search(lnl) or med_pattern.search(ln):
+            # PRIORITY 3: If it has clear dosage info AND units, likely medication
+            if med_pattern.search(ln) and len(ln) < 100:
                 medications.append(ln)
+                continue
+            
+            # PRIORITY 4: If it has dosage words AND units, likely medication
+            if dosage_pattern.search(lnl_clean) and unit_pattern.search(ln) and len(ln) < 150:
+                medications.append(ln)
+                continue
+            
+            # PRIORITY 5: Contains dosage words alone
+            if dosage_pattern.search(lnl_clean) and len(ln) < 150:
+                medications.append(ln)
+        
+        # Last resort: return something
+        if not medications and not patient_info and lines:
+            # Return lines with numbers (likely dosages)
+            for ln in lines:
+                if re.search(r'\d', ln) and len(ln) < 200:
+                    medications.append(ln)
+            
+            # Or just return first few lines
+            if not medications:
+                medications = lines[:20]
+        
+        self.logger.info(f"Extracted {len(patient_info)} info lines, {len(medications)} medications from {len(lines)} parsed lines")
+        return patient_info, medications
         
         return patient_info, medications

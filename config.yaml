@@ -6,6 +6,7 @@ app:
 tesseract:
   path: "tesseract/tesseract.exe"
   lang: "vie"
+  # OEM 1: LSTM only (best for modern documents), PSM 6: Assume uniform block text
   config: "--oem 1 --psm 6"
 
 models:
@@ -13,10 +14,11 @@ models:
   cache_dir: "models/"
 
 ocr:
-  max_image_dimension: 1600
-  denoise_strength: 10
-  adaptive_threshold_block: 31
-  adaptive_threshold_c: 9
+  # Image preprocessing parameters - tuned for medical documents
+  max_image_dimension: 10000 # Max dimension in pixels
+  denoise_strength: 10 # Higher = more denoising (0-15 recommended)
+  adaptive_threshold_block: 31 # Block size for adaptive threshold (must be odd)
+  adaptive_threshold_c: 9 # Constant subtracted from mean (affects darkness)
 
 keywords:
   info:
@@ -29,12 +31,17 @@ keywords:
     - "bác sĩ"
     - "chẩn đoán"
     - "ngày khám"
-  
+    - "mạch"
+    - "thân nhiệt"
+    - "sinh iệu"
+
   blacklist:
     - "stt"
     - "tên thuốc"
     - "hàm lượng"
     - "đơn thuốc"
+    - "lưu ý"
+    - "ghi chú"
 
 logging:
   level: "INFO"

@@ -2,3 +2,4 @@ build/
 dist/
 tesseract/
 venv311/
+.vscode/

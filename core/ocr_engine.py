@@ -39,13 +39,26 @@ class OCREngine:
             self.logger.error(f"Tesseract setup error: {e}")
             raise
     
-    def extract_text(self, image_path, callback=None):
-        """Trích xuất văn bản từ ảnh"""
+    def extract_text(self, image_path, callback=None, return_preprocessing_steps=False):
+        """Trích xuất văn bản từ ảnh
+        
+        Args:
+            image_path: Path to the image
+            callback: Status callback function
+            return_preprocessing_steps: If True, returns (text, preprocessing_dict)
+            
+        Returns:
+            If return_preprocessing_steps=False: extracted text string
+            If return_preprocessing_steps=True: tuple (text, preprocessing_steps_dict)
+        """
         try:
             if callback:
                 callback("⏳ Preprocessing image...")
             
-            processed_img = self.preprocessor.process(image_path)
+            processed_img, preprocessing_steps = self.preprocessor.process(
+                image_path, 
+                return_steps=True
+            )
             
             if callback:
                 callback("⏳ Running OCR...")
@@ -62,6 +75,9 @@ class OCREngine:
             text = self._post_process_text(text)
             
             self.logger.info(f"OCR completed. Extracted {len(text)} characters")
+            
+            if return_preprocessing_steps:
+                return text, preprocessing_steps
             return text
             
         except Exception as e:
@@ -72,17 +88,19 @@ class OCREngine:
     
     def _post_process_text(self, text):
         """Sửa lỗi OCR phổ biến"""
-        fixes = {
-            'độ go}': 'Địa chỉ',
-            'Họiên': 'Họ tên',
-            'Namj': 'Nam',
-            'Điệnthoại': 'Điện thoại',
-            'Chẳn đoán': 'Chẩn đoán',
-            'sảng': 'sáng',
-            'Ngày ti': 'Ngày tái',
+        # Replace common OCR mistakes
+        replacements = {
+            'O': '0',  # Letter O to Zero in numbers
+            'l': '1',  # Letter l to One in certain contexts
+            '|': 'I',  # Pipe to I
         }
         
-        for wrong, correct in fixes.items():
-            text = text.replace(wrong, correct)
+        # Remove extra spaces and clean up
+        text = ' '.join(text.split())
+        
+        # Remove isolated special characters that are likely noise
+        import re
+        text = re.sub(r'\s+', ' ', text)  # Multiple spaces to single
+        text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', text)  # Remove control chars
         
         return text
